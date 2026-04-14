@@ -1,7 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
   
@@ -24,15 +20,26 @@ Rules:
 - Topic is: ${topic}`;
 
   try {
-    const message = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+    // OpenRouter se direct baat karne ka code
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.ANTHROPIC_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "anthropic/claude-3.5-sonnet", // OpenRouter ke through Claude
+        messages: [{ role: "user", content: prompt }]
+      })
     });
     
-    const text = message.content[0].text;
-    const questions = JSON.parse(text);
+    const data = await response.json();
+    let text = data.choices[0].message.content;
     
+    // Agar AI extra format laga de, toh use saaf karna
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    
+    const questions = JSON.parse(text);
     res.status(200).json({ questions });
   } catch (err) {
     console.error(err);
