@@ -2,15 +2,8 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY; // Vercel Settings mein jo key hai
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     const { topic, numQ } = req.body;
-
-    const prompt = `You are a math teacher. Generate exactly ${numQ} multiple choice questions about "${topic}".
-    IMPORTANT: Return ONLY a valid JSON array. Do not add any conversational text, no markdown, no formatting.
-    Format exactly like this:
-    [
-      {"question": "What is 2+2?", "options": ["1", "2", "3", "4"], "answer": "4"}
-    ]`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -20,28 +13,34 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "meta-llama/llama-3.1-8b-instruct:free",
-        messages: [{ role: "user", content: prompt }]
+        messages: [{ 
+          role: "user", 
+          content: `Generate a JSON array of ${numQ} math MCQs about ${topic}. Format: [{"question": "...", "options": ["...", "..."], "answer": "..."}]` 
+        }]
       })
     });
 
-    const data = await response.json();
+    // Check if response is okay
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenRouter Error: ${response.status} - ${errorText}`);
+    }
 
-    if (data.error) {
-      throw new Error(`OpenRouter Error: ${data.error.message}`);
+    const data = await response.json();
+    
+    if (!data.choices || data.choices.length === 0) {
+      throw new Error("AI ne koi answer nahi diya. Please try again.");
     }
 
     let text = data.choices[0].message.content;
-
-    // JSON ko extract karne ka smart tareeka
     const startIndex = text.indexOf('[');
     const endIndex = text.lastIndexOf(']');
+    
     if (startIndex === -1 || endIndex === -1) {
-      throw new Error("AI response format error");
+      throw new Error("AI response format galat hai.");
     }
 
-    const cleanJson = text.substring(startIndex, endIndex + 1);
-    const questions = JSON.parse(cleanJson);
-
+    const questions = JSON.parse(text.substring(startIndex, endIndex + 1));
     res.status(200).json({ questions });
 
   } catch (err) {
