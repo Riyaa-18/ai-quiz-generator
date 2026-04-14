@@ -20,7 +20,6 @@ Rules:
 - Topic is: ${topic}`;
 
   try {
-    // OpenRouter se direct baat karne ka code
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -28,21 +27,27 @@ Rules:
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "anthropic/claude-3.5-sonnet", // OpenRouter ke through Claude
+        model: "meta-llama/llama-3.1-8b-instruct:free", // 100% FREE MODEL 🔥
         messages: [{ role: "user", content: prompt }]
       })
     });
     
     const data = await response.json();
+    
+    // Agar api key ya balance ka koi error hoga toh hume ab pata chal jayega
+    if (data.error) {
+      throw new Error(data.error.message);
+    }
+    
     let text = data.choices[0].message.content;
     
-    // Agar AI extra format laga de, toh use saaf karna
+    // Extra text hatane ka jugaad
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
     
     const questions = JSON.parse(text);
     res.status(200).json({ questions });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to generate quiz" });
+    res.status(500).json({ error: err.message || "Failed to generate quiz" });
   }
 }
